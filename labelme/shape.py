@@ -77,9 +77,9 @@ class Shape(object):
         self._closed = True
 
     def addPoint(self, point):
-        if self.points and point == self.points[0]:
-            self.close()
-        else:
+        #if self.points and point == self.points[0]:
+        #   self.close()
+        #else:
             self.points.append(point)
 
     def popPoint(self):

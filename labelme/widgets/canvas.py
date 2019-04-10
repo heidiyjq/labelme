@@ -36,7 +36,7 @@ class Canvas(QtWidgets.QWidget):
     _fill_drawing = False
 
     def __init__(self, *args, **kwargs):
-        self.epsilon = kwargs.pop('epsilon', 11.0)
+        self.epsilon = kwargs.pop('epsilon', 3.0) #同一点判断阈值设置
         super(Canvas, self).__init__(*args, **kwargs)
         # Initialise local state.
         self.mode = self.EDIT
@@ -71,6 +71,8 @@ class Canvas(QtWidgets.QWidget):
         # Set widget options.
         self.setMouseTracking(True)
         self.setFocusPolicy(QtCore.Qt.WheelFocus)
+        # mouse press state
+        self._leftMousePress = False
 
     def fillDrawing(self):
         return self._fill_drawing
@@ -171,14 +173,18 @@ class Canvas(QtWidgets.QWidget):
                 # Project the point to the pixmap's edges.
                 pos = self.intersectionPoint(self.current[-1], pos)
             elif len(self.current) > 1 and self.createMode == 'polygon' and\
-                    self.closeEnough(pos, self.current[0]):
+                    self.closeEnough(pos, self.current[0]) and self._leftMousePress == False:
                 # Attract line to starting point and
                 # colorise to alert the user.
                 pos = self.current[0]
                 color = self.current.line_color
                 self.overrideCursor(CURSOR_POINT)
                 self.current.highlightVertex(0, Shape.NEAR_VERTEX)
-            if self.createMode in ['polygon', 'linestrip']:
+            if self.createMode == 'polygon' and self._leftMousePress == True:
+                self.current.addPoint(pos)
+                self.line[0] = self.current[-1]
+                self.line[1] = pos
+            elif self.createMode in ['polygon', 'linestrip']:
                 self.line[0] = self.current[-1]
                 self.line[1] = pos
             elif self.createMode == 'rectangle':
@@ -284,6 +290,7 @@ class Canvas(QtWidgets.QWidget):
         else:
             pos = self.transformPos(ev.posF())
         if ev.button() == QtCore.Qt.LeftButton:
+            self._leftMousePress = True
             if self.drawing():
                 if self.current:
                     # Add point to existing shape.
@@ -318,10 +325,13 @@ class Canvas(QtWidgets.QWidget):
                 self.selectShapePoint(pos)
                 self.prevPoint = pos
                 self.repaint()
-        elif ev.button() == QtCore.Qt.RightButton and self.editing():
-            self.selectShapePoint(pos)
-            self.prevPoint = pos
-            self.repaint()
+        elif ev.button() == QtCore.Qt.RightButton:
+            if self.editing():
+                self.selectShapePoint(pos)
+                self.prevPoint = pos
+                self.repaint()
+            elif self.createMode == 'polygon':
+                self.current.close()
 
     def mouseReleaseEvent(self, ev):
         if ev.button() == QtCore.Qt.RightButton:
@@ -337,6 +347,8 @@ class Canvas(QtWidgets.QWidget):
         if self.movingShape:
             self.storeShapes()
             self.shapeMoved.emit()
+        #TODO:修改
+        self._leftMousePress = False
 
     def endMove(self, copy=False):
         assert self.selectedShape and self.selectedShapeCopy
